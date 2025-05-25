@@ -17,7 +17,7 @@ try {
 $errors = [];
 
 // 1) Validación de formulario
-$fields = ['firstname','lastname','phone','address','career','email'];
+$fields = ['firstname','lastname','phone','address','career','email','tipo'];
 foreach ($fields as $f) {
     $$f = trim($_POST[$f] ?? '');
 }
@@ -86,14 +86,15 @@ if ($errors) {
 try {
     $hash = password_hash($password, PASSWORD_BCRYPT);
     $sql  = "INSERT INTO users
-        (firstname, lastname, email, password, career, phone, address, photo, is_approved,created_at,updated_at)
-        VALUES (?,?,?,?,?,?,?,?,1,NOW(),NOW())";
+        (firstname, lastname, email, password,tipo, career, phone, address, photo, is_approved,created_at,updated_at)
+        VALUES (?,?,?,?,?,?,?,?,?,1,NOW(),NOW())";
     $stmt = $pdo->prepare($sql);
     $stmt->execute([
         $firstname,
         $lastname,
         $email,
         $hash,
+         $_POST['tipo'] ?? 'admin',
         $career,
         $phone,
         $address,

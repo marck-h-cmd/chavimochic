@@ -24,7 +24,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST' || ($_POST['form'] ?? '') !== 'updateu
 
 
 $id        = intval($_POST['id'] ?? 0);
-$fields    = ['firstname','lastname','email','career','phone','address'];
+$fields    = ['firstname','lastname','email','career','phone','address','tipo'];
 $data      = [];
 $errors    = [];
 foreach ($fields as $f) {
@@ -95,48 +95,92 @@ if ($hasNewPhoto) {
 
 // 7) Ejecutar el UPDATE en la tabla users
 //    Si hay foto nueva, incluimos la columna photo en el UPDATE
-if ($hasNewPhoto) {
-    $sql = "UPDATE users SET
-                firstname = ?,
-                lastname  = ?,
-                email     = ?,
-                phone     = ?,
-                address   = ?,
-                career    = ?,
-                photo     = ?,        -- agregamos aquí la foto
-                updated_at = NOW()
-            WHERE id = ?";
+try {
+    $pdo->beginTransaction();
+    
+    // 1. Actualizar datos del usuario
+    if ($hasNewPhoto) {
+        $sql = "UPDATE users SET
+                    firstname = ?,
+                    lastname = ?,
+                    email = ?,
+                    phone = ?,
+                    address = ?,
+                    career = ?,
+                    tipo = ?,
+                    photo = ?,
+                    updated_at = NOW()
+                WHERE id = ?";
+        $params = [
+            $data['firstname'],
+            $data['lastname'],
+            $data['email'],
+            $data['phone'],
+            $data['address'],
+            $data['career'],
+            $data['tipo'],
+            $photoPath,
+            $id
+        ];
+    } else {
+        $sql = "UPDATE users SET
+                    firstname = ?,
+                    lastname = ?,
+                    email = ?,
+                    phone = ?,
+                    address = ?,
+                    career = ?,
+                    tipo = ?,
+                    updated_at = NOW()
+                WHERE id = ?";
+        $params = [
+            $data['firstname'],
+            $data['lastname'],
+            $data['email'],
+            $data['phone'],
+            $data['address'],
+            $data['career'],
+            $data['tipo'],
+            $id
+        ];
+    }
+    
     $stmt = $pdo->prepare($sql);
-    $stmt->execute([
-        $data['firstname'],
-        $data['lastname'],
-        $data['email'],
-        $data['phone'],
-        $data['address'],
-        $data['career'],
-        $destRel,  // ruta relativa de la nueva foto
-        $id
-    ]);
-} else {
-    // No hubo foto nueva; solo actualizamos los demás campos
-$sql = "UPDATE users SET
-            firstname = ?, lastname = ?, email = ?, phone = ?,
-            address = ?, career = ?, created_at = NOW(), updated_at = NOW()
-        WHERE id = ?";
-$stmt = $pdo->prepare($sql);
-$stmt->execute([
-    $data['firstname'],
-    $data['lastname'],
-    $data['email'],
-    $data['phone'],
-    $data['address'],
-    $data['career'],
-    $id
-]);
+    $stmt->execute($params);
 
+    // 2. Manejar requerimientos asignados
+    if (isset($_POST['requerimientos'])) {
+        $requerimientos = array_filter(
+            explode(',', $_POST['requerimientos']), 
+            function($value) {
+                return is_numeric($value) && $value > 0;
+            }
+        );
+        
+        // Eliminar asignaciones anteriores
+        $deleteStmt = $pdo->prepare("DELETE FROM area_detalle WHERE userId = ?");
+        $deleteStmt->execute([$id]);
+        
+        // Insertar nuevas asignaciones
+        if (!empty($requerimientos)) {
+            $insertStmt = $pdo->prepare("INSERT INTO area_detalle (userId, requerimiento_id) VALUES (?, ?)");
+            
+            foreach ($requerimientos as $reqId) {
+                $insertStmt->execute([$id, intval($reqId)]);
+            }
+        }
+    }
+    
+    $pdo->commit();
+    $_SESSION['success-update'] = 'Usuario actualizado con éxito.';
+    
+} catch (PDOException $e) {
+    $pdo->rollBack();
+    $_SESSION['errors'] = ['Error al actualizar el usuario: ' . $e->getMessage()];
+    error_log('Error en update_user: ' . $e->getMessage()); // Log del error
+    header('Location: /chavimochic/src/Views/administrador/general/managementusers/showusers.php');
+    exit;
 }
-
-$_SESSION['success-update'] = 'Usuario actualizado con éxito.';
 header('Location: /chavimochic/src/Views/administrador/general/managementusers/showusers.php');
 exit;
 

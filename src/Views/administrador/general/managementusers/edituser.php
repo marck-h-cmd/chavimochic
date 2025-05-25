@@ -65,6 +65,13 @@ require_once __DIR__ . '/../../../dash/plantilla.php';
                     <label for="photo" class="block">Foto (opcional)</label>
                     <input type="file" id="photo" name="photo" class="w-full px-2 py-1 border rounded" accept="image/*">
             </div>
+              <div class="mb-4">
+                <label for="tipo" class="block">Tipo de Usuario</label>
+                <select id="tipo" name="tipo" value="<?= htmlspecialchars($old['tipo']) ?>" class="w-full px-4 py-2 border rounded" required>
+                    <option value="admin" >Admin</option>
+                    <option value="superadmin">Superadmin</option>
+                </select>
+            </div>
          
             <div class="flex space-x-4">
                 <button type="submit" class="bg-blue-500 text-white px-6 py-2 rounded hover:bg-blue-700">
@@ -76,4 +83,4 @@ require_once __DIR__ . '/../../../dash/plantilla.php';
             </div>
         </form>
     </div>
-<?php
+?>

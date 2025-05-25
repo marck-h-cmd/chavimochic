@@ -20,6 +20,7 @@ $user = $_SESSION['user'] ?? null;
 $currentUri = $_SERVER['REQUEST_URI'];
 
 
+
 // 2) Conectar y leer usuario
 try {
     $pdo = new PDO(
@@ -32,10 +33,35 @@ try {
 }
 
 
+
 $stmt = $pdo->prepare("SELECT * FROM users WHERE id=? LIMIT 1");
 $stmt->execute([ $_SESSION['user_id'] ]);
 $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
+$userId = $_SESSION['user_id'];
+$tipoUsuario = $_SESSION['user']['tipo'] ?? $user['tipo'] ?? 'usuario';
+$esSuperadmin = ($tipoUsuario === 'superadmin');
+$esAdmin = ($tipoUsuario === 'admin');
+
+try {
+    if ($esSuperadmin) {
+        // Superadmin ve todos los requerimientos
+        $stmt = $pdo->query("SELECT * FROM requerimientos ORDER BY id DESC");
+    } else {
+        // Admin normal solo ve sus requerimientos asignados
+        $stmt = $pdo->prepare("
+            SELECT r.* 
+            FROM requerimientos r
+            JOIN area_detalle ad ON r.id = ad.requerimiento_id
+            WHERE ad.userId = ?
+            ORDER BY r.id DESC
+        ");
+        $stmt->execute([$userId]);
+    }
+    $requerimientosAsignados = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    die("Error al obtener requerimientos: " . $e->getMessage());
+}
 
 ?>
 <!DOCTYPE html>
@@ -60,6 +86,7 @@ $user = $stmt->fetch(PDO::FETCH_ASSOC);
       <img src="/chavimochic/static/template/images/logopechv3.png" alt="logo_labcam" class="max-w-full">
     </a>
     <ul class="mt-8">
+      <?php if ($esSuperadmin): ?>
       <h4 class="text-[#98C560] text-sm font-bold uppercase mb-3">Administración general</h4>
       <li class="mb-1">
         <a href="/chavimochic/src/Views/administrador/general/selectprincipal.php"
@@ -96,7 +123,7 @@ $user = $stmt->fetch(PDO::FETCH_ASSOC);
                     </li>                
                 </ul>
       </li>
-
+            <?php endif; ?>
       <li class="mb-1">
         <a href="/chavimochic/src/Views/administrador/general/selectedit-profile.php"
            class="flex items-center py-2 px-4 text-white hover:bg-[#98C560] rounded-md <?= ($_GET['action'] ?? '')==='editUser'?'bg-[#98C560]':'' ?>">
@@ -106,6 +133,7 @@ $user = $stmt->fetch(PDO::FETCH_ASSOC);
       </li>
 
       <h4 class="text-[#98C560] uppercase text-sm font-bold mb-3 mt-8">Pestañas</h4>
+        <?php if ($esSuperadmin): ?>
       <li class="mb-1">
         <a href="/chavimochic/src/Views/administrador/panel/showpanel.php"
            class="flex items-center py-2 px-4 text-white hover:bg-[#98C560] rounded-md <?= ($_GET['action'] ?? '')==='areaUsuaria'?'bg-[#98C560]':'' ?>">
@@ -113,6 +141,32 @@ $user = $stmt->fetch(PDO::FETCH_ASSOC);
           <span class="text-sm">Area Usuaria</span>
         </a>
       </li>
+       <?php elseif ($esAdmin): ?>
+          <?php if (!empty($requerimientosAsignados)): ?>
+        <?php foreach ($requerimientosAsignados as $requerimiento): ?>
+            <li class="mb-1">
+                <a href="/chavimochic/src/Views/administrador/panel/seguimientoarea.php?id=<?= $requerimiento['id'] ?>"class="flex items-center py-2 px-4 text-white hover:bg-[#98C560] rounded-md ">
+                    <i class="ri-folder-user-line mr-3 text-lg"></i>
+                    <span class="text-sm truncate">
+                        <?= htmlspecialchars($requerimiento['ITEM']) ?>
+                        <?php if ($tipoUsuario === 'superadmin'): ?>
+                            <span class="text-xs block text-gray-300">ID: <?= $requerimiento['id'] ?></span>
+                        <?php endif; ?>
+                    </span>
+                </a>
+            </li>
+        <?php endforeach; ?>
+    <?php else: ?>
+        <li class="mb-1">
+            <div class="flex items-center py-2 px-4 text-gray-400 rounded-md">
+                <i class="ri-folder-user-line mr-3 text-lg"></i>
+                <span class="text-sm">No hay requerimientos</span>
+            </div>
+        </li>
+    <?php endif; ?>
+
+
+         <?php endif; ?>
     </ul>
     <div class="fixed top-0 left-[300px] w-full h-full z-40 md:hidden sidebar-overlay backdrop-blur-sm"></div>
   </aside>
